@@ -1,0 +1,36 @@
+{
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug rsem-parse-alignments",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/rsem-parse-alignments",
+      "args": [
+        "/home/triston/workspace/CSD/unlv/input/hg19",
+        "/home/triston/workspace/CSD/unlv/output/chr22.transcriptome",
+        "/home/triston/workspace/CSD/unlv/output/chr22.transcriptome",
+        "/home/triston/workspace/CSD/unlv/input/chr22.transcriptome.genome.bam",
+        "3",
+        "-tag XM"
+      ],
+      "stopAtEntry": false,
+      "cwd": "${workspaceFolder}",
+      "environment": [],
+      "externalConsole": false,
+      "MIMode": "gdb",
+      "setupCommands": [
+        {
+          "description": "Enable pretty-printing for gdb",
+          "text": "-enable-pretty-printing",
+          "ignoreFailures": true
+        }
+      ],
+      "preLaunchTask": "build with make",
+      "miDebuggerPath": "/usr/bin/gdb"
+    }
+  ]
+}
