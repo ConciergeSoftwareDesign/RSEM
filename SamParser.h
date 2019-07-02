@@ -27,7 +27,7 @@
 
 class SamParser {
 public:
-	SamParser(const char* inpF, const char* aux, Transcripts& transcripts, const char* imdName);
+	SamParser(const char* inpF, const char* aux, Transcripts& transcripts, const char* imdName, bool useGenome = false);
 	~SamParser();
 
 	/**
@@ -85,7 +85,7 @@ private:
 char SamParser::rtTag[STRLEN] = ""; // default : no tag, thus no Type 2 reads
 
 // aux, if not 0, points to the file name of fn_list
-SamParser::SamParser(const char* inpF, const char* aux, Transcripts& transcripts, const char* imdName)
+SamParser::SamParser(const char* inpF, const char* aux, Transcripts& transcripts, const char* imdName, bool useGenome)
 	: transcripts(transcripts), n_warns(0)
 {
 	sam_in = sam_open(inpF, "r");
@@ -95,7 +95,13 @@ SamParser::SamParser(const char* inpF, const char* aux, Transcripts& transcripts
 	header = sam_hdr_read(sam_in);
 	general_assert(header != 0, "Fail to parse sam header!");
 
-	transcripts.buildMappings(header->n_targets, header->target_name, imdName);
+	if (!useGenome) {
+		printf("Building mappings from non-genome file");
+		transcripts.buildMappings(header->n_targets, header->target_name, imdName);
+	} else {
+		printf("Building mappings from genome file");
+		transcripts.buildMappings(header->n_targets, sam_in, header, imdName);
+	}
 
 	b = bam_init1();
 	b2 = bam_init1();

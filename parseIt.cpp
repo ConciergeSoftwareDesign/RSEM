@@ -51,8 +51,8 @@ char readOutFs[3][2][STRLEN];
 map<int, READ_INT_TYPE> counter;
 map<int, READ_INT_TYPE>::iterator iter;
 
-void init(const char* imdName, const char* alignF) {
-	parser = new SamParser(alignF, aux, transcripts, imdName);
+void init(const char* imdName, const char* alignF, bool useGenome = false) {
+	parser = new SamParser(alignF, aux, transcripts, imdName, useGenome);
 
 	memset(cat, 0, sizeof(cat));
 	memset(readOutFs, 0, sizeof(readOutFs));
@@ -167,18 +167,20 @@ void release() {
 
 int main(int argc, char* argv[]) {
 	if (argc < 6) {
-		printf("Usage : rsem-parse-alignments refName imdName statName alignF read_type [-t fai_file] [-tag tagName] [-q]\n");
+		printf("Usage : rsem-parse-alignments refName imdName statName alignF read_type [-t fai_file] [-tag tagName] [-q] [-g]\n");
 		exit(-1);
 	}
 
 	read_type = atoi(argv[5]);
 	
 	aux = NULL;
+	bool useGenome = false;
 	if (argc > 6) {
 	  for (int i = 6; i < argc; ++i) {
 	    if (!strcmp(argv[i], "-t")) aux = argv[i + 1];
 	    if (!strcmp(argv[i], "-tag")) SamParser::setReadTypeTag(argv[i + 1]);
 	    if (!strcmp(argv[i], "-q")) verbose = false;
+		if (!strcmp(argv[i], "-g")) useGenome = true;
 	  }
 	}
 
@@ -190,7 +192,7 @@ int main(int argc, char* argv[]) {
 	sprintf(datF, "%s.dat", argv[2]);
 	sprintf(cntF, "%s.cnt", argv[3]);
 
-	init(argv[2], argv[4]);
+	init(argv[2], argv[4], useGenome);
 
 	hit_out.open(datF);
 

@@ -13,8 +13,11 @@
 #include<map>
 #include<string>
 
+#include "htslib/sam.h"
+#include "sam_utils.h"
 #include "utils.h"
 #include "my_assert.h"
+#include "intervalTree.h"
 #include "Transcript.h"
 
 class Transcripts {
@@ -70,6 +73,8 @@ public:
 	}
 
 	void buildMappings(int, char**, const char* = NULL);
+	void buildMappings(int, samFile*, bam_hdr_t* , const char* = NULL);
+	std::map<std::string, ITNode*> createIntervalTrees(std::vector<Transcript>, int);
 
 private:
 	int M, type; // type 0 from genome, 1 standalone transcriptome, 2 allele-specific 
@@ -84,7 +89,9 @@ void Transcripts::readFrom(const char* inpF) {
 
 	if (!fin.is_open()) { fprintf(stderr, "Cannot open %s! It may not exist.\n", inpF); exit(-1); }
 
+	// Read the number of transcripts (M) and the type from the first line of the .ti file
 	fin>>M>>type;
+	printf("M is %d and type is %d", M, type);
 	getline(fin, line);
 	transcripts.assign(M + 1, Transcript());
 	for (int i = 1; i <= M; i++) {
@@ -113,9 +120,12 @@ void Transcripts::buildMappings(int n_targets, char** target_name, const char* i
 
 	dict.clear();
 	for (int i = 1; i <= M; i++) {
+		// Create an id to represent the transcript
 		const std::string& tid = isAlleleSpecific() ? transcripts[i].getSeqName() : transcripts[i].getTranscriptID();
+		// Make sure that the id does not already occur in the dictionary
 		iter = dict.find(tid);
 		general_assert(iter == dict.end(), "RSEM's indices might be corrupted, " + tid + " appears more than once!");
+		// Create an entry in the dictionary mapping to an index 
 		dict[tid] = i;
 	}
 
@@ -123,7 +133,10 @@ void Transcripts::buildMappings(int n_targets, char** target_name, const char* i
 	i2e.assign(M + 1, 0);
 	appeared.assign(M + 1, false);
 	for (int i = 0; i < n_targets; i++) {
+		// target_name in the case of genome mapping is the chromosome
 		iter = dict.find(std::string(target_name[i]));
+		// if we don't do someting about the search here, this assert will fail as rsem is looking
+		// for a chromosome inside a list of transcript names, which is obviously not valid
 		general_assert(iter != dict.end(), "RSEM can not recognize reference sequence name " + cstrtos(target_name[i]) + "!");
 		general_assert(iter->second > 0, "Reference sequence name " + cstrtos(target_name[i]) + " appears more than once in the SAM/BAM file!");
 		e2i[i + 1] = iter->second;
@@ -140,6 +153,87 @@ void Transcripts::buildMappings(int n_targets, char** target_name, const char* i
 	    if (!appeared[i]) fprintf(fo, "%d\n", i);
 	  fclose(fo);
 	}
+}
+
+void Transcripts::buildMappings(int n_targets, samFile* sam_in, bam_hdr_t* header, const char* imdName) {
+	std::map<std::string, int> dict;
+	std::map<std::string, int>::iterator iter;
+	std::vector<bool> appeared;
+	e2i.assign(M + 1, 0);
+	i2e.assign(M + 1, 0);
+	appeared.assign(M + 1, false);
+
+	dict.clear();
+	for (int i = 1; i <= M; i++) {
+		// Create an id to represent the transcript
+		const std::string& tid = isAlleleSpecific() ? transcripts[i].getSeqName() : transcripts[i].getTranscriptID();
+		// Make sure that the id does not already occur in the dictionary
+		iter = dict.find(tid);
+		general_assert(iter == dict.end(), "RSEM's indices might be corrupted, " + tid + " appears more than once!");
+		// Create an entry in the dictionary mapping to an index 
+		dict[tid] = i;
+	}
+
+	// TODO: Build interval trees. Each interval tree should be for a specific
+	// chromosome. chr -> intervalTree
+	std::map<std::string, ITNode*> intervalTrees = createIntervalTrees(transcripts, M);
+
+	bam1_t *b;
+	for(int i = 0; i < n_targets && sam_read1(sam_in, header, b) > -1; i++) {
+		// We sequentially read each genome mapping from the sam file, creating an 
+		// index from that mapping (i) to our internal ids (in the dict)
+		// TODO: We cannot just use target_name[i] like the other function, as target_name[i]
+		// is actually the name of the chromosome. Instead, we need to use an interval tree (?)
+		// to look up the transcript name for the particular genome mapping `b`
+		ITInterval interval = {};
+		interval.low = b->core.pos;
+		interval.high = interval.low + b->core.l_qseq;
+
+		ITNode* node = overlapSearch(intervalTrees[bam_get_qname(b)], interval);
+		if (node == NULL) {
+			printf("Interval not found");
+			continue;
+		}
+
+		// TODO: This is what we are trying to eventually do (iter is the reference in the dictionary):
+		iter = dict.find(std::string(node->transcript->getTranscriptName()));
+		e2i[i + 1] = iter->second;
+		i2e[iter->second] = i + 1;
+		iter->second = -1;
+		appeared[e2i[i + 1]] = true;
+	}
+
+	if (imdName != NULL) {
+	  char omitF[STRLEN];
+	  sprintf(omitF, "%s.omit", imdName);
+	  FILE *fo = fopen(omitF, "w");
+	  for (int i = 1; i <= M; i++) 
+	    if (!appeared[i]) fprintf(fo, "%d\n", i);
+	  fclose(fo);
+	}
+}
+
+std::map<std::string, ITNode*> Transcripts::createIntervalTrees(std::vector<Transcript> transcripts, int tLength) {
+	std::map<std::string, ITNode*> trees;
+	for (int i = 1; i < tLength; i++) {
+		Transcript* transcript = &transcripts[i];
+		std::string chromosome = transcript->getSeqName();
+		std::vector<Interval> structure = transcript->getStructure();
+
+		for(std::vector<Interval>::iterator it = structure.begin(); it != structure.end(); ++it) {
+			ITInterval interval = {};
+			interval.low = (*it).start;
+			interval.high = (*it).end;
+
+			trees[chromosome] = insert(
+				trees[chromosome],
+				interval,
+				transcript
+			);
+		}
+	}
+
+	return trees;
 }
 
 #endif /* TRANSCRIPTS_H_ */
