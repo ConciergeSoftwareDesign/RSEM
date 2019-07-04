@@ -70,6 +70,8 @@ public:
 
 	int getLength() const { return length; }
 
+	int getPosition() const { return position; }
+
 	const std::vector<Interval>& getStructure() const { return structure; }
 
 	void extractSeq (const std::string&, std::string&) const;
@@ -78,6 +80,7 @@ public:
 	void write(std::ofstream&);
 
 private:
+	int position = -1; // transcript pos
 	int length; // transcript length
 	std::vector<Interval> structure; // transcript structure , coordinate starts from 1
 	char strand;
@@ -142,6 +145,7 @@ void Transcript::read(std::ifstream& fin) {
 		int start, end;
 		fin>>start>>end;
 		structure.push_back(Interval(start, end));
+		position = position == -1 ? start : std::min(position, start);
 	}
 	getline(fin, tmp); //get the end of this line
 	getline(fin, left);

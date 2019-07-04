@@ -39,7 +39,7 @@ char groupF[STRLEN], tiF[STRLEN];
 char datF[STRLEN], cntF[STRLEN];
 
 GroupInfo gi;
-Transcripts transcripts;
+TranscriptsGenome transcripts;
 
 SamParser *parser;
 ofstream hit_out;

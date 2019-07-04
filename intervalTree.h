@@ -13,23 +13,25 @@ struct ITNode
     ITInterval *interval; 
     int max; 
     ITNode *left, *right;
-    Transcript *transcript;
+    int transcriptId;
 }; 
   
-ITNode* newNode(ITInterval i, Transcript *t) 
+ITNode* newNode(ITInterval i, int transcriptId) 
 { 
-    ITNode *temp = new ITNode; 
+    ITNode *temp = new ITNode(); 
     temp->interval = new ITInterval(i); 
     temp->max = i.high; 
-    temp->transcript = t;
+    temp->transcriptId = transcriptId;
     temp->left = temp->right = NULL; 
+
+    return temp;
 }; 
   
-ITNode* insert(ITNode* root, ITInterval i, Transcript *t) 
+ITNode* insert(ITNode* root, ITInterval i, int transcriptId) 
 { 
     // If the tree is empty, insert the new node as the root
     if (root == NULL) 
-        return newNode(i, t); 
+        return newNode(i, transcriptId); 
   
     // Get low value of interval at root 
     int lowValue = root->interval->low; 
@@ -37,11 +39,11 @@ ITNode* insert(ITNode* root, ITInterval i, Transcript *t)
     // If root's low value is smaller, then new interval goes to 
     // left subtree 
     if (i.low < lowValue) 
-        root->left = insert(root->left, i, t); 
+        root->left = insert(root->left, i, transcriptId); 
   
     // Else, new node goes to right subtree. 
     else
-        root->right = insert(root->right, i, t); 
+        root->right = insert(root->right, i, transcriptId); 
   
     // Update the max value of this ancestor if needed 
     if (root->max < i.high) 

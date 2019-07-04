@@ -12,7 +12,7 @@ BOOST = .
 
 # Compilation variables
 CXX = g++
-CXXFLAGS = -std=gnu++98 -Wall -I. -I$(BOOST) -I$(SAMTOOLS)/$(HTSLIB)
+CXXFLAGS = -g -std=gnu++98 -Wall -I. -I$(BOOST) -I$(SAMTOOLS)/$(HTSLIB)
 CPPFLAGS =
 
 LDFLAGS =
@@ -127,6 +127,7 @@ simulation.o : simulation.cpp utils.h Read.h SingleRead.h SingleReadQ.h PairedEn
 # Dependencies for header files
 Transcript.h : utils.h
 Transcripts.h : utils.h my_assert.h Transcript.h
+TranscriptsGenome.h : $(SAMHEADERS) utils.h my_assert.h Transcripts.h
 BowtieRefSeqPolicy.h : RefSeqPolicy.h
 RefSeq.h : utils.h
 Refs.h : utils.h RefSeq.h RefSeqPolicy.h PolyARules.h

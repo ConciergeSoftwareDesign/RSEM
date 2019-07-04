@@ -11,11 +11,12 @@
       "program": "${workspaceFolder}/rsem-parse-alignments",
       "args": [
         "/home/triston/workspace/CSD/unlv/input/hg19",
-        "/home/triston/workspace/CSD/unlv/output/chr22.transcriptome",
-        "/home/triston/workspace/CSD/unlv/output/chr22.transcriptome",
+        "/home/triston/workspace/CSD/unlv/output/chr22.transcriptome.genome",
+        "/home/triston/workspace/CSD/unlv/output/chr22.transcriptome.genome",
         "/home/triston/workspace/CSD/unlv/input/chr22.transcriptome.genome.bam",
         "3",
-        "-tag XM"
+        "-tag XM",
+        "-g"
       ],
       "stopAtEntry": false,
       "cwd": "${workspaceFolder}",
@@ -29,7 +30,7 @@
           "ignoreFailures": true
         }
       ],
-      "preLaunchTask": "build with make",
+      // "preLaunchTask": "build with make",
       "miDebuggerPath": "/usr/bin/gdb"
     }
   ]

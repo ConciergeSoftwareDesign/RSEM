@@ -23,11 +23,11 @@
 #include "PairedEndHit.h"
 
 #include "Transcripts.h"
-
+#include "TranscriptsGenome.h"
 
 class SamParser {
 public:
-	SamParser(const char* inpF, const char* aux, Transcripts& transcripts, const char* imdName, bool useGenome = false);
+	SamParser(const char* inpF, const char* aux, TranscriptsGenome& transcripts, const char* imdName, bool useGenome = false);
 	~SamParser();
 
 	/**
@@ -52,7 +52,7 @@ private:
 	bam_hdr_t *header;
 	bam1_t *b, *b2;
 
-	Transcripts& transcripts;
+	TranscriptsGenome& transcripts;
 
 	int n_warns; // Number of warnings
 	
@@ -80,27 +80,58 @@ private:
 	  
 	  return 0;
 	}
+
+	void initSamFile(const char* inpF, const char* aux) {
+		sam_in = sam_open(inpF, "r");
+		general_assert(sam_in != 0, "Cannot open " + cstrtos(inpF) + "! It may not exist.");
+
+		if (aux != NULL) hts_set_fai_filename(sam_in, aux);
+		header = sam_hdr_read(sam_in);
+		general_assert(header != 0, "Fail to parse sam header!");
+	}
+
+	void closeSamFile() {
+		sam_close(sam_in);
+		sam_in = NULL;
+		header = NULL;
+	}
+
+	int getHitPosition(bam1_t* b, bool isReversed) {
+		if (transcripts.getIsUsingGenomeFile()) {
+			Transcript t = transcripts.getTranscriptAt(
+				transcripts.getInternalSid(b, header->target_name[b->core.tid])
+			);
+			if (isReversed) {
+				return t.getLength() - (b->core.pos - t.getPosition()) - b->core.l_qseq;
+			} else {
+				return b->core.pos - t.getPosition();
+			}
+		} else if (isReversed) {
+			return header->target_len[b->core.tid] - b->core.pos - b->core.l_qseq;
+		} else {
+			return b->core.pos;
+		}
+	}
 };
 
 char SamParser::rtTag[STRLEN] = ""; // default : no tag, thus no Type 2 reads
 
 // aux, if not 0, points to the file name of fn_list
-SamParser::SamParser(const char* inpF, const char* aux, Transcripts& transcripts, const char* imdName, bool useGenome)
+SamParser::SamParser(const char* inpF, const char* aux, TranscriptsGenome& transcripts, const char* imdName, bool useGenome)
 	: transcripts(transcripts), n_warns(0)
 {
-	sam_in = sam_open(inpF, "r");
-	general_assert(sam_in != 0, "Cannot open " + cstrtos(inpF) + "! It may not exist.");
-
-	if (aux != NULL) hts_set_fai_filename(sam_in, aux);
-	header = sam_hdr_read(sam_in);
-	general_assert(header != 0, "Fail to parse sam header!");
+	initSamFile(inpF, aux);
 
 	if (!useGenome) {
-		printf("Building mappings from non-genome file");
+		printf("Building mappings from non-genome file\n");
 		transcripts.buildMappings(header->n_targets, header->target_name, imdName);
 	} else {
-		printf("Building mappings from genome file");
-		transcripts.buildMappings(header->n_targets, sam_in, header, imdName);
+		printf("Building mappings from genome file\n");
+		
+		transcripts.buildMappingsGenome(sam_in, header, imdName);
+		// Close and re-open the file, as the genome file has been read through by the above function
+		closeSamFile();
+		initSamFile(inpF, aux);
 	}
 
 	b = bam_init1();
@@ -140,10 +171,16 @@ int SamParser::parseNext(SingleRead& read, SingleHit& hit) {
 	if (readType == 1) {
 	  general_assert(bam_check_cigar(b), "Read " + name + ": RSEM currently does not support gapped alignments, sorry!\n");
 	  if (bam_is_rev(b)) {
-	    hit = SingleHit(-transcripts.getInternalSid(b->core.tid + 1), header->target_len[b->core.tid] - b->core.pos - b->core.l_qseq);
+	    hit = SingleHit(
+			-transcripts.getInternalSid(b, header->target_name[b->core.tid]),
+			getHitPosition(b, true)
+		);
 	  }
 	  else {
-	    hit = SingleHit(transcripts.getInternalSid(b->core.tid + 1), b->core.pos);
+	    hit = SingleHit(
+			transcripts.getInternalSid(b, header->target_name[b->core.tid]),
+			getHitPosition(b, false)
+		);
 	  }
 	}
 
@@ -172,10 +209,16 @@ int SamParser::parseNext(SingleReadQ& read, SingleHit& hit) {
 	if (readType == 1) {
 	  general_assert(bam_check_cigar(b), "Read " + name + ": RSEM currently does not support gapped alignments, sorry!\n");
 	  if (bam_is_rev(b)) {
-	    hit = SingleHit(-transcripts.getInternalSid(b->core.tid + 1), header->target_len[b->core.tid] - b->core.pos - b->core.l_qseq);
+	    hit = SingleHit(
+			-transcripts.getInternalSid(b, header->target_name[b->core.tid]),
+			getHitPosition(b, true)
+		);
 	  }
 	  else {
-	    hit = SingleHit(transcripts.getInternalSid(b->core.tid + 1), b->core.pos);    
+	    hit = SingleHit(
+			transcripts.getInternalSid(b, header->target_name[b->core.tid]),
+			getHitPosition(b, false)
+		);
 	  }
 	}
 
@@ -217,10 +260,18 @@ int SamParser::parseNext(PairedEndRead& read, PairedEndHit& hit) {
 	  general_assert(bam_check_cigar(b) && bam_check_cigar(b2), "Read " + name + ": RSEM currently does not support gapped alignments, sorry!");
 	  general_assert(b->core.tid == b2->core.tid, "Read " + name + ": The two mates do not align to a same transcript! RSEM does not support discordant alignments.");
 	  if (bam_is_rev(b)) {
-	    hit = PairedEndHit(-transcripts.getInternalSid(b->core.tid + 1), header->target_len[b->core.tid] - b->core.pos - b->core.l_qseq, b->core.pos + b->core.l_qseq - b2->core.pos);
+	    hit = PairedEndHit(
+			-transcripts.getInternalSid(b, header->target_name[b->core.tid]),
+			getHitPosition(b, true),
+			b->core.pos + b->core.l_qseq - b2->core.pos
+		);
 	  }
 	  else {
-	    hit = PairedEndHit(transcripts.getInternalSid(b->core.tid + 1), b->core.pos, b2->core.pos + b2->core.l_qseq - b->core.pos);
+	    hit = PairedEndHit(
+			transcripts.getInternalSid(b, header->target_name[b->core.tid]),
+			getHitPosition(b, false),
+			b2->core.pos + b2->core.l_qseq - b->core.pos
+		);
 	  }
 	}
 
@@ -261,10 +312,18 @@ int SamParser::parseNext(PairedEndReadQ& read, PairedEndHit& hit) {
 	  general_assert(bam_check_cigar(b) && bam_check_cigar(b2), "Read " + name + ": RSEM currently does not support gapped alignments, sorry!");
 	  general_assert(b->core.tid == b2->core.tid, "Read " + name + ": The two mates do not align to a same transcript! RSEM does not support discordant alignments.");
 	  if (bam_is_rev(b)) {
-	    hit = PairedEndHit(-transcripts.getInternalSid(b->core.tid + 1), header->target_len[b->core.tid] - b->core.pos - b->core.l_qseq, b->core.pos + b->core.l_qseq - b2->core.pos);
+	    hit = PairedEndHit(
+			-transcripts.getInternalSid(b, header->target_name[b->core.tid]),
+			getHitPosition(b, true),
+			b->core.pos + b->core.l_qseq - b2->core.pos
+		);
 	  }
 	  else {
-	    hit = PairedEndHit(transcripts.getInternalSid(b->core.tid + 1), b->core.pos, b2->core.pos + b2->core.l_qseq - b->core.pos);
+	    hit = PairedEndHit(
+			transcripts.getInternalSid(b, header->target_name[b->core.tid]),
+			getHitPosition(b, false),
+			b2->core.pos + b2->core.l_qseq - b->core.pos
+		);
 	  }
 	}
 	
