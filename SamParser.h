@@ -108,9 +108,9 @@ private:
 
 			Transcript t = transcripts.getTranscriptAt(internalSid);
 			if (isReversed) {
-				return t.getLength() - (b->core.pos - t.getPosition()) - b->core.l_qseq;
+				return t.getLength() - (b->core.pos - t.getPosition()) - b->core.l_qseq - 1;
 			} else {
-				return b->core.pos - t.getPosition();
+				return b->core.pos - t.getPosition() + 1;
 			}
 		} else if (isReversed) {
 			return header->target_len[b->core.tid] - b->core.pos - b->core.l_qseq;
@@ -135,9 +135,6 @@ SamParser::SamParser(const char* inpF, const char* aux, TranscriptsGenome& trans
 		printf("Building mappings from genome file\n");
 		
 		transcripts.buildMappingsGenome(sam_in, header, imdName);
-		// Close and re-open the file, as the genome file has been read through by the above function
-		closeSamFile();
-		initSamFile(inpF, aux);
 	}
 
 	b = bam_init1();
@@ -318,18 +315,18 @@ int SamParser::parseNext(PairedEndReadQ& read, PairedEndHit& hit) {
 	  general_assert(bam_check_cigar(b) && bam_check_cigar(b2), "Read " + name + ": RSEM currently does not support gapped alignments, sorry!");
 	  general_assert(b->core.tid == b2->core.tid, "Read " + name + ": The two mates do not align to a same transcript! RSEM does not support discordant alignments.");
 	  if (bam_is_rev(b)) {
-	    hit = PairedEndHit(
-			-transcripts.getInternalSid(b, header->target_name[b->core.tid]),
-			getHitPosition(b, true),
-			b->core.pos + b->core.l_qseq - b2->core.pos
-		);
+			hit = PairedEndHit(
+				-transcripts.getInternalSid(b, header->target_name[b->core.tid]),
+				getHitPosition(b, true),
+				b->core.pos + b->core.l_qseq - b2->core.pos
+			);
 	  }
 	  else {
 	    hit = PairedEndHit(
-			transcripts.getInternalSid(b, header->target_name[b->core.tid]),
-			getHitPosition(b, false),
-			b2->core.pos + b2->core.l_qseq - b->core.pos
-		);
+				transcripts.getInternalSid(b, header->target_name[b->core.tid]),
+				getHitPosition(b, false),
+				b2->core.pos + b2->core.l_qseq - b->core.pos
+			);
 	  }
 	}
 	

@@ -16,7 +16,7 @@ public:
 				return internalId;
 			}
 		} else {
-			return Transcripts::getInternalSid(b->core.tid);
+			return Transcripts::getInternalSid(b->core.tid + 1);
 		}
 	}
 
