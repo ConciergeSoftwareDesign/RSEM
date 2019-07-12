@@ -9,19 +9,49 @@ public:
 
 	int getInternalSid(bam1_t* b, std::string target_name) {
 		if (getIsUsingGenomeFile()) {
-			return e2iString[buildExternalKey(b, target_name)];
+			int internalId = searchInternalId(b, target_name);
+			if (internalId < 0) {
+				return INFINITY;
+			} else {
+				return internalId;
+			}
 		} else {
 			return Transcripts::getInternalSid(b->core.tid);
 		}
 	}
 
+	int searchInternalId(bam1_t* b, std::string chromosome) {
+		std::string externalId = buildExternalKey(b, chromosome);
+		if (externalKeyToInternalId.find(externalId) != externalKeyToInternalId.end()) {
+			return externalKeyToInternalId[externalId];
+		}
+
+		ITInterval interval = {};
+		interval.low = b->core.pos;
+		interval.high = interval.low + b->core.l_qseq;
+
+		ITNode* node = overlapSearch(intervalTrees[chromosome], interval);
+		if (node == NULL) {
+			externalKeyToInternalId[externalId] = -1;
+			return -1;
+		}
+
+		externalKeyToInternalId[externalId] = node->transcriptId;
+		return node->transcriptId;
+	}
+
 	void buildMappings(int, char**, const char*);
-    void buildMappingsGenome(samFile*, bam_hdr_t* , const char* = NULL);
+  void buildMappingsGenome(samFile*, bam_hdr_t* , const char* = NULL);
+	void setHasAppeared(int, bool);
+	void writeOmitFile(const char*);
+
 	std::map<std::string, ITNode*> createIntervalTrees(std::vector<Transcript>, int);
 
 private:
 	bool isUsingGenomeFile = false;
-	std::map<std::string, int> e2iString;
+	std::vector<bool> appeared;
+	std::map<std::string, ITNode*> intervalTrees;
+	std::map<std::string, int> externalKeyToInternalId;
 
 	std::string buildExternalKey(bam1_t* b, std::string target_name) {
 		return target_name + itos(b->core.pos);
@@ -34,49 +64,22 @@ void TranscriptsGenome::buildMappings(int n_targets, char** target_name, const c
 }
 
 void TranscriptsGenome::buildMappingsGenome(samFile* sam_in, bam_hdr_t* header, const char* imdName) {
-	std::vector<bool> appeared;
 	i2e.assign(M + 1, 0);
 	appeared.assign(M + 1, false);
-	e2iString.clear();
 	isUsingGenomeFile = true;
 
-	// TODO: Build interval trees. Each interval tree should be for a specific
-	// chromosome. chr -> intervalTree
-	std::map<std::string, ITNode*> intervalTrees = createIntervalTrees(transcripts, M);
+	// Build a map of chromosome -> interval tree
+	intervalTrees = createIntervalTrees(transcripts, M);
+}
 
-	bam1_t *b = bam_init1();
-	while(sam_read1(sam_in, header, b) > -1) {
-		// We sequentially read each genome mapping from the sam file, creating an 
-		// index from that mapping (i) to our internal ids (in the dict)
-		// TODO: We cannot just use target_name[i] like the other function, as target_name[i]
-		// is actually the name of the chromosome. Instead, we need to use an interval tree (?)
-		// to look up the transcript name for the particular genome mapping `b`
-		if (!bam_is_proper(b)) {
-			continue;
-		}
+void TranscriptsGenome::setHasAppeared(int index, bool hasAppeared) {
+	appeared[index] = hasAppeared;
+}
 
-		std::string chromosome = header->target_name[b->core.tid];
-		std::string externalId = buildExternalKey(b, chromosome);
-
-		ITInterval interval = {};
-		interval.low = b->core.pos;
-		interval.high = interval.low + b->core.l_qseq;
-
-		ITNode* node = overlapSearch(intervalTrees[chromosome], interval);
-		if (node == NULL) {
-			continue; // TODO: Is this an error condition?
-		}
-
-		Transcript* transcript = &transcripts[node->transcriptId];
-		std::string transcriptName = isAlleleSpecific() ? transcript->getSeqName() : transcript->getTranscriptID();
-
-		e2iString[externalId] = node->transcriptId;
-		appeared[node->transcriptId] = true;
-	}
-
-	if (imdName != NULL) {
+void TranscriptsGenome::writeOmitFile(const char* filename) {
+	if (filename != NULL && isUsingGenomeFile) {
 	  char omitF[STRLEN];
-	  sprintf(omitF, "%s.omit", imdName);
+	  sprintf(omitF, "%s.omit", filename);
 	  FILE *fo = fopen(omitF, "w");
 	  for (int i = 1; i <= M; i++) 
 	    if (!appeared[i]) fprintf(fo, "%d\n", i);

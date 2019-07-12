@@ -201,11 +201,13 @@ int main(int argc, char* argv[]) {
 	hit_out<<firstLine;
 
 	switch(read_type) {
-	case 0 : parseIt<SingleRead, SingleHit>(parser); break;
-	case 1 : parseIt<SingleReadQ, SingleHit>(parser); break;
-	case 2 : parseIt<PairedEndRead, PairedEndHit>(parser); break;
-	case 3 : parseIt<PairedEndReadQ, PairedEndHit>(parser); break;
+		case 0 : parseIt<SingleRead, SingleHit>(parser); break;
+		case 1 : parseIt<SingleReadQ, SingleHit>(parser); break;
+		case 2 : parseIt<PairedEndRead, PairedEndHit>(parser); break;
+		case 3 : parseIt<PairedEndReadQ, PairedEndHit>(parser); break;
 	}
+
+	transcripts.writeOmitFile(argv[2]);
 
 	hit_out.seekp(0, ios_base::beg);
 	hit_out<<N[1]<<" "<<nHits<<" "<<read_type;

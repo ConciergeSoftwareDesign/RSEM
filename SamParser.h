@@ -98,9 +98,15 @@ private:
 
 	int getHitPosition(bam1_t* b, bool isReversed) {
 		if (transcripts.getIsUsingGenomeFile()) {
-			Transcript t = transcripts.getTranscriptAt(
-				transcripts.getInternalSid(b, header->target_name[b->core.tid])
-			);
+			int internalSid = transcripts.getInternalSid(b, header->target_name[b->core.tid]);
+			if (internalSid == INFINITY) {
+				return INFINITY;
+			}
+
+			//TODO: This is a bit of strange place to do this
+			transcripts.setHasAppeared(internalSid, true);
+
+			Transcript t = transcripts.getTranscriptAt(internalSid);
 			if (isReversed) {
 				return t.getLength() - (b->core.pos - t.getPosition()) - b->core.l_qseq;
 			} else {
