@@ -21,22 +21,15 @@ public:
 	}
 
 	int searchInternalId(bam1_t* b, std::string chromosome) {
-		std::string externalId = buildExternalKey(b, chromosome);
-		if (externalKeyToInternalId.find(externalId) != externalKeyToInternalId.end()) {
-			return externalKeyToInternalId[externalId];
-		}
-
 		ITInterval interval = {};
 		interval.low = b->core.pos;
 		interval.high = interval.low + b->core.l_qseq;
 
 		ITNode* node = overlapSearch(intervalTrees[chromosome], interval);
 		if (node == NULL) {
-			externalKeyToInternalId[externalId] = -1;
 			return -1;
 		}
 
-		externalKeyToInternalId[externalId] = node->transcriptId;
 		return node->transcriptId;
 	}
 
