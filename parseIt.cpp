@@ -87,6 +87,7 @@ void parseIt(SamParser *parser) {
 	READ_INT_TYPE cnt = 0;
 
 	record_val = -2; //indicate no recorded read now
+	// parseNext can return 99, which implies a read should be skipped
 	while ((val = parser->parseNext(read, hit)) >= 0) {
 		if (val >= 0 && val <= 2) {
 			// flush out previous read's info if needed

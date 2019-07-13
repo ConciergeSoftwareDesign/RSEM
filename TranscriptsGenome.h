@@ -9,12 +9,7 @@ public:
 
 	int getInternalSid(bam1_t* b, std::string target_name) {
 		if (getIsUsingGenomeFile()) {
-			int internalId = searchInternalId(b, target_name);
-			if (internalId < 0) {
-				return INFINITY;
-			} else {
-				return internalId;
-			}
+			return searchInternalId(b, target_name);
 		} else {
 			return Transcripts::getInternalSid(b->core.tid + 1);
 		}

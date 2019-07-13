@@ -96,11 +96,15 @@ private:
 		header = NULL;
 	}
 
+	/**
+	 *  Get the hit position for a certain read, specifying if the read has the incorrect 
+	 * 	orientation (isReversed). Returns -1 for reads where there is no valid position 
+	 */
 	int getHitPosition(bam1_t* b, bool isReversed) {
 		if (transcripts.getIsUsingGenomeFile()) {
 			int internalSid = transcripts.getInternalSid(b, header->target_name[b->core.tid]);
-			if (internalSid == INFINITY) {
-				return INFINITY;
+			if (internalSid == -1) {
+				return -1;
 			}
 
 			//TODO: This is a bit of strange place to do this
@@ -173,17 +177,21 @@ int SamParser::parseNext(SingleRead& read, SingleHit& hit) {
 
 	if (readType == 1) {
 	  general_assert(bam_check_cigar(b), "Read " + name + ": RSEM currently does not support gapped alignments, sorry!\n");
+
+		int sid = transcripts.getInternalSid(b, header->target_name[b->core.tid]);
+		if (sid == -1) return 99;
+
 	  if (bam_is_rev(b)) {
 	    hit = SingleHit(
-			-transcripts.getInternalSid(b, header->target_name[b->core.tid]),
-			getHitPosition(b, true)
-		);
+				-sid,
+				getHitPosition(b, true)
+			);
 	  }
 	  else {
 	    hit = SingleHit(
-			transcripts.getInternalSid(b, header->target_name[b->core.tid]),
-			getHitPosition(b, false)
-		);
+				sid,
+				getHitPosition(b, false)
+			);
 	  }
 	}
 
@@ -211,17 +219,21 @@ int SamParser::parseNext(SingleReadQ& read, SingleHit& hit) {
 
 	if (readType == 1) {
 	  general_assert(bam_check_cigar(b), "Read " + name + ": RSEM currently does not support gapped alignments, sorry!\n");
+
+		int sid = transcripts.getInternalSid(b, header->target_name[b->core.tid]);
+		if (sid == -1) return 99;
+
 	  if (bam_is_rev(b)) {
 	    hit = SingleHit(
-			-transcripts.getInternalSid(b, header->target_name[b->core.tid]),
-			getHitPosition(b, true)
-		);
+				-sid,
+				getHitPosition(b, true)
+			);
 	  }
 	  else {
 	    hit = SingleHit(
-			transcripts.getInternalSid(b, header->target_name[b->core.tid]),
-			getHitPosition(b, false)
-		);
+				sid,
+				getHitPosition(b, false)
+			);
 	  }
 	}
 
@@ -262,16 +274,20 @@ int SamParser::parseNext(PairedEndRead& read, PairedEndHit& hit) {
 	if (readType == 1) {
 	  general_assert(bam_check_cigar(b) && bam_check_cigar(b2), "Read " + name + ": RSEM currently does not support gapped alignments, sorry!");
 	  general_assert(b->core.tid == b2->core.tid, "Read " + name + ": The two mates do not align to a same transcript! RSEM does not support discordant alignments.");
+
+		int sid = transcripts.getInternalSid(b, header->target_name[b->core.tid]);
+		if (sid == -1) return 99;
+
 	  if (bam_is_rev(b)) {
 	    hit = PairedEndHit(
-			-transcripts.getInternalSid(b, header->target_name[b->core.tid]),
+			-sid,
 			getHitPosition(b, true),
 			b->core.pos + b->core.l_qseq - b2->core.pos
 		);
 	  }
 	  else {
 	    hit = PairedEndHit(
-			transcripts.getInternalSid(b, header->target_name[b->core.tid]),
+			sid,
 			getHitPosition(b, false),
 			b2->core.pos + b2->core.l_qseq - b->core.pos
 		);
@@ -314,16 +330,20 @@ int SamParser::parseNext(PairedEndReadQ& read, PairedEndHit& hit) {
 	if (readType == 1) {
 	  general_assert(bam_check_cigar(b) && bam_check_cigar(b2), "Read " + name + ": RSEM currently does not support gapped alignments, sorry!");
 	  general_assert(b->core.tid == b2->core.tid, "Read " + name + ": The two mates do not align to a same transcript! RSEM does not support discordant alignments.");
+
+		int sid = transcripts.getInternalSid(b, header->target_name[b->core.tid]);
+		if (sid == -1) return 99;
+
 	  if (bam_is_rev(b)) {
 			hit = PairedEndHit(
-				-transcripts.getInternalSid(b, header->target_name[b->core.tid]),
+				-sid,
 				getHitPosition(b, true),
 				b->core.pos + b->core.l_qseq - b2->core.pos
 			);
 	  }
 	  else {
 	    hit = PairedEndHit(
-				transcripts.getInternalSid(b, header->target_name[b->core.tid]),
+				sid,
 				getHitPosition(b, false),
 				b2->core.pos + b2->core.l_qseq - b->core.pos
 			);

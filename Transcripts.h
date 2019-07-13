@@ -130,8 +130,6 @@ void Transcripts::buildMappings(int n_targets, char** target_name, const char* i
 	for (int i = 0; i < n_targets; i++) {
 		// target_name in the case of genome mapping is the chromosome
 		iter = dict.find(std::string(target_name[i]));
-		// if we don't do someting about the search here, this assert will fail as rsem is looking
-		// for a chromosome inside a list of transcript names, which is obviously not valid
 		general_assert(iter != dict.end(), "RSEM can not recognize reference sequence name " + cstrtos(target_name[i]) + "!");
 		general_assert(iter->second > 0, "Reference sequence name " + cstrtos(target_name[i]) + " appears more than once in the SAM/BAM file!");
 		e2i[i + 1] = iter->second;
