@@ -102,7 +102,6 @@ private:
 	 */
 	int getHitPosition(bam1_t* b, int internalSid, bool isReversed) {
 		if (transcripts.getIsUsingGenomeFile()) {
-			// int internalSid = transcripts.getInternalSid(b, header->target_name[b->core.tid]);
 			if (internalSid == -1) {
 				return -1;
 			}
@@ -121,6 +120,42 @@ private:
 		} else {
 			return b->core.pos;
 		}
+	}
+
+	/**
+	 * Get the length of a hit given the two reads as a pair, the hit position, 
+	 * and whether or not it's reversed
+	 */
+	int getHitLength(bam1_t* b1, bam1_t* b2, int hitPosition, bool isReversed) {
+		int length;
+		if (isReversed) {
+			length = b->core.pos + b->core.l_qseq - b2->core.pos;
+		} else {
+			length = b2->core.pos + b2->core.l_qseq - b->core.pos;
+		}
+
+		// In the case where we are searching for overlap between a read's position
+		// and a transcript's position (when we are using the genome file), the "hitPosition"
+		// of a read can be negative if it starts before the transcript. We subtract the 
+		// position of the read from the length, and later set the negative position to
+		// zero to reflect the read's position in the transcript.
+		if (transcripts.getIsUsingGenomeFile() && hitPosition < 0) {
+			length += hitPosition;
+		}
+
+		return length;
+	}
+
+	PairedEndHit getPairedEndHit(bam1_t* b1, bam1_t* b2, int internalSid) {
+		bool isReversed = bam_is_rev(b1);
+		int position = getHitPosition(b1, internalSid, isReversed);
+		int length = getHitLength(b1, b2, position, isReversed);
+
+		return PairedEndHit(
+			isReversed ? -internalSid : internalSid,
+			max(position, 0), // make sure the position is "bounded" to the transcript
+			length
+		);
 	}
 };
 
@@ -278,20 +313,7 @@ int SamParser::parseNext(PairedEndRead& read, PairedEndHit& hit) {
 		int sid = transcripts.getInternalSid(b, header->target_name[b->core.tid]);
 		if (sid == -1) return 99;
 
-	  if (bam_is_rev(b)) {
-	    hit = PairedEndHit(
-			-sid,
-			getHitPosition(b, sid, true),
-			b->core.pos + b->core.l_qseq - b2->core.pos
-		);
-	  }
-	  else {
-	    hit = PairedEndHit(
-			sid,
-			getHitPosition(b, sid, false),
-			b2->core.pos + b2->core.l_qseq - b->core.pos
-		);
-	  }
+		hit = getPairedEndHit(b, b2, sid);
 	}
 
 	return val;
@@ -334,20 +356,7 @@ int SamParser::parseNext(PairedEndReadQ& read, PairedEndHit& hit) {
 		int sid = transcripts.getInternalSid(b, header->target_name[b->core.tid]);
 		if (sid == -1) return 99;
 
-	  if (bam_is_rev(b)) {
-			hit = PairedEndHit(
-				-sid,
-				getHitPosition(b, sid, true),
-				b->core.pos + b->core.l_qseq - b2->core.pos
-			);
-	  }
-	  else {
-	    hit = PairedEndHit(
-				sid,
-				getHitPosition(b, sid, false),
-				b2->core.pos + b2->core.l_qseq - b->core.pos
-			);
-	  }
+	  hit = getPairedEndHit(b, b2, sid);
 	}
 	
 	return val;
