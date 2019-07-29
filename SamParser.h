@@ -100,9 +100,9 @@ private:
 	 *  Get the hit position for a certain read, specifying if the read has the incorrect 
 	 * 	orientation (isReversed). Returns -1 for reads where there is no valid position 
 	 */
-	int getHitPosition(bam1_t* b, bool isReversed) {
+	int getHitPosition(bam1_t* b, int internalSid, bool isReversed) {
 		if (transcripts.getIsUsingGenomeFile()) {
-			int internalSid = transcripts.getInternalSid(b, header->target_name[b->core.tid]);
+			// int internalSid = transcripts.getInternalSid(b, header->target_name[b->core.tid]);
 			if (internalSid == -1) {
 				return -1;
 			}
@@ -184,13 +184,13 @@ int SamParser::parseNext(SingleRead& read, SingleHit& hit) {
 	  if (bam_is_rev(b)) {
 	    hit = SingleHit(
 				-sid,
-				getHitPosition(b, true)
+				getHitPosition(b, sid, true)
 			);
 	  }
 	  else {
 	    hit = SingleHit(
 				sid,
-				getHitPosition(b, false)
+				getHitPosition(b, sid, false)
 			);
 	  }
 	}
@@ -226,13 +226,13 @@ int SamParser::parseNext(SingleReadQ& read, SingleHit& hit) {
 	  if (bam_is_rev(b)) {
 	    hit = SingleHit(
 				-sid,
-				getHitPosition(b, true)
+				getHitPosition(b, sid, true)
 			);
 	  }
 	  else {
 	    hit = SingleHit(
 				sid,
-				getHitPosition(b, false)
+				getHitPosition(b, sid, false)
 			);
 	  }
 	}
@@ -281,14 +281,14 @@ int SamParser::parseNext(PairedEndRead& read, PairedEndHit& hit) {
 	  if (bam_is_rev(b)) {
 	    hit = PairedEndHit(
 			-sid,
-			getHitPosition(b, true),
+			getHitPosition(b, sid, true),
 			b->core.pos + b->core.l_qseq - b2->core.pos
 		);
 	  }
 	  else {
 	    hit = PairedEndHit(
 			sid,
-			getHitPosition(b, false),
+			getHitPosition(b, sid, false),
 			b2->core.pos + b2->core.l_qseq - b->core.pos
 		);
 	  }
@@ -337,14 +337,14 @@ int SamParser::parseNext(PairedEndReadQ& read, PairedEndHit& hit) {
 	  if (bam_is_rev(b)) {
 			hit = PairedEndHit(
 				-sid,
-				getHitPosition(b, true),
+				getHitPosition(b, sid, true),
 				b->core.pos + b->core.l_qseq - b2->core.pos
 			);
 	  }
 	  else {
 	    hit = PairedEndHit(
 				sid,
-				getHitPosition(b, false),
+				getHitPosition(b, sid, false),
 				b2->core.pos + b2->core.l_qseq - b->core.pos
 			);
 	  }
