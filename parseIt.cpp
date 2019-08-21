@@ -157,6 +157,11 @@ void parseIt(SamParser *parser, bool useGenome = false) {
 		nIsoMulti += hits.calcNumIsoformMultiReads();
 		hits.write(hit_out);
 
+		if (useGenome) {
+			genomeHits.updateRI();
+			genomeHits.write(genome_hit_out);
+		}
+
 		iter = counter.find(hits.getNHits());
 		if (iter != counter.end()) {
 			iter->second++;
