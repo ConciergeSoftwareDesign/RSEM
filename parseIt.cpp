@@ -36,13 +36,17 @@ HIT_INT_TYPE nHits; // # of hits
 READ_INT_TYPE nUnique, nMulti, nIsoMulti;
 char *aux;
 char groupF[STRLEN], tiF[STRLEN];
-char datF[STRLEN], cntF[STRLEN];
+char datF[STRLEN], cntF[STRLEN], genomeDatF[STRLEN];
 
 GroupInfo gi;
 TranscriptsGenome transcripts;
 
 SamParser *parser;
 ofstream hit_out;
+// in the case where we are reading a genome-aligned bam file and we want to write
+// both transcript-aligned and genome-aligned hits, this is the output file for the
+// genome aligned hits
+ofstream genome_hit_out; 
 
 int n_os; // number of ostreams
 ostream *cat[3][2]; // cat : category  1-dim 0 N0 1 N1 2 N2; 2-dim  0 mate1 1 mate2
@@ -73,12 +77,14 @@ void init(const char* imdName, const char* alignF, bool useGenome = false) {
 
 //Do not allow duplicate for unalignable reads and supressed reads in SAM input
 template<class ReadType, class HitType>
-void parseIt(SamParser *parser) {
+void parseIt(SamParser *parser, bool useGenome = false) {
 	// record_val & record_read are copies of val & read for record purpose
 	int val, record_val;
 	ReadType read, record_read;
 	HitType hit;
+	HitType genomeHit;
 	HitContainer<HitType> hits;
+	HitContainer<HitType> genomeHits;
 
 	nHits = 0;
 	nUnique = nMulti = nIsoMulti = 0;
@@ -88,7 +94,7 @@ void parseIt(SamParser *parser) {
 
 	record_val = -2; //indicate no recorded read now
 	// parseNext can return 99, which implies a read should be skipped
-	while ((val = parser->parseNext(read, hit)) >= 0) {
+	while ((val = useGenome ? parser->parseNext(read, hit, genomeHit) : parser->parseNext(read, hit)) >= 0) {
 		if (val >= 0 && val <= 2) {
 			// flush out previous read's info if needed
 			if (record_val >= 0) {
@@ -105,6 +111,10 @@ void parseIt(SamParser *parser) {
 				nMulti += hits.calcNumGeneMultiReads(gi);
 				nIsoMulti += hits.calcNumIsoformMultiReads();
 				hits.write(hit_out);
+				if (useGenome) {
+					genomeHits.updateRI();
+					genomeHits.write(genome_hit_out);
+				}
 
 				iter = counter.find(hits.getNHits());
 				if (iter != counter.end()) {
@@ -116,12 +126,19 @@ void parseIt(SamParser *parser) {
 			}
 
 			hits.clear();
+			if (useGenome) {
+				genomeHits.clear();
+			}
+
 			record_val = val;
 			record_read = read; // no pointer, thus safe
 		}
 
 		if (val == 1 || val == 5) {
 			hits.push_back(hit);
+			if (useGenome) {
+				genomeHits.push_back(genomeHit);
+			}
 		}
 
 		++cnt;
@@ -168,7 +185,7 @@ void release() {
 
 int main(int argc, char* argv[]) {
 	if (argc < 6) {
-		printf("Usage : rsem-parse-alignments refName imdName statName alignF read_type [-t fai_file] [-tag tagName] [-q] [-g]\n");
+		printf("Usage: rsem-parse-alignments refName imdName statName alignF read_type [-t fai_file] [-tag tagName] [-q] [-g]\n");
 		exit(-1);
 	}
 
@@ -201,19 +218,30 @@ int main(int argc, char* argv[]) {
 	firstLine.append(1, '\n');		//May be dangerous!
 	hit_out<<firstLine;
 
+	if (useGenome) {
+		sprintf(genomeDatF, "%s.genome.dat", argv[2]);
+		genome_hit_out.open(genomeDatF);
+		genome_hit_out << firstLine;
+	}
+
 	switch(read_type) {
-		case 0 : parseIt<SingleRead, SingleHit>(parser); break;
-		case 1 : parseIt<SingleReadQ, SingleHit>(parser); break;
-		case 2 : parseIt<PairedEndRead, PairedEndHit>(parser); break;
-		case 3 : parseIt<PairedEndReadQ, PairedEndHit>(parser); break;
+		case 0 : parseIt<SingleRead, SingleHit>(parser, useGenome); break;
+		case 1 : parseIt<SingleReadQ, SingleHit>(parser, useGenome); break;
+		case 2 : parseIt<PairedEndRead, PairedEndHit>(parser, useGenome); break;
+		case 3 : parseIt<PairedEndReadQ, PairedEndHit>(parser, useGenome); break;
 	}
 
 	transcripts.writeOmitFile(argv[2]);
 
 	hit_out.seekp(0, ios_base::beg);
 	hit_out<<N[1]<<" "<<nHits<<" "<<read_type;
-
 	hit_out.close();
+
+	if (useGenome) {
+		genome_hit_out.seekp(0, ios_base::beg);
+		genome_hit_out<<N[1]<<" "<<nHits<<" "<<read_type;
+		genome_hit_out.close();
+	}
 
 	//cntF for statistics of alignments file
 	ofstream fout(cntF);
