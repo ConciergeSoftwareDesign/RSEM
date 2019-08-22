@@ -131,7 +131,7 @@ private:
 	 * Get the length of a hit given the two reads as a pair, the hit position, 
 	 * and whether or not it's reversed
 	 */
-	int getHitLength(bam1_t* b1, bam1_t* b2, int hitPosition, bool isReversed, bool calculateTranscriptPos) {
+	int getHitLength(bam1_t* b1, bam1_t* b2, int internalSid, int hitPosition, bool isReversed, bool calculateTranscriptPos) {
 		int length;
 		if (isReversed) {
 			length = b->core.pos + b->core.l_qseq - b2->core.pos;
@@ -139,14 +139,24 @@ private:
 			length = b2->core.pos + b2->core.l_qseq - b->core.pos;
 		}
 
-		// In the case where we are searching for overlap between a read's position
-		// and a transcript's position (when we are using the genome file), the "hitPosition"
-		// of a read can be negative if it starts before the transcript. We subtract the 
-		// position of the read from the length, and later set the negative position to
-		// zero to reflect the read's position in the transcript.
-		if (calculateTranscriptPos && hitPosition < 0) {
-			length += hitPosition;
+		if (calculateTranscriptPos) {
+			Transcript t = transcripts.getTranscriptAt(internalSid);
+
+			// In the case where we are searching for overlap between a read's position
+			// and a transcript's position (when we are using the genome file), the "hitPosition"
+			// of a read can be negative if it starts before the transcript. We subtract the 
+			// position of the read from the length, and later set the negative position to
+			// zero to reflect the read's position in the transcript.
+			if (hitPosition < 0) {
+				length += hitPosition;
+			}
+
+			// We also cannot allow the length of a hit to exceed that of the transcript it is mapped
+			// to. This seems to be a non-issue for transcript-based bam files, but for chromosome (genome)
+			// based files, we are calculating the length and this case can occur.
+			length = min(t.getLength() - max(0, hitPosition), length);
 		}
+		
 
 		return length;
 	}
@@ -299,7 +309,7 @@ void SamParser::createHit(SingleHit &hit, int sid, bool calculateTranscriptPos) 
 void SamParser::createHit(PairedEndHit &hit, int sid, bool calculateTranscriptPos) {
 	bool isReversed = bam_is_rev(b);
 	int position = getHitPosition(b, sid, isReversed, calculateTranscriptPos);
-	int length = getHitLength(b, b2, position, isReversed, calculateTranscriptPos);
+	int length = getHitLength(b, b2, sid, position, isReversed, calculateTranscriptPos);
 
 	hit = PairedEndHit(
 		isReversed ? -sid : sid,

@@ -110,7 +110,7 @@ void QProfile::finish() {
 
 double QProfile::getProb(const std::string& readseq, const std::string& qual, const RefSeq& refseq, int pos, int dir) {
 	double prob = 1.0;
-	int len = readseq.size();
+	int len = std::min((int) readseq.size(), refseq.getTotLen() - pos);
 
 	for (int i = 0; i < len; i++) {
 		prob *= p[c2q(qual[i])][refseq.get_id(i + pos, dir)][get_base_id(readseq[i])];

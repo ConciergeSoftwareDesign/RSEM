@@ -11,12 +11,42 @@
       "program": "${workspaceFolder}/rsem-parse-alignments",
       "args": [
         "/home/triston/workspace/CSD/unlv/input/hg19",
-        "/home/triston/workspace/CSD/unlv/output/chr22.transcriptome.genome",
-        "/home/triston/workspace/CSD/unlv/output/chr22.transcriptome.genome",
-        "/home/triston/workspace/CSD/unlv/input/chr22.transcriptome.genome.bam",
+        "/home/triston/workspace/CSD/unlv/output/chr22.genome.unsorted.new",
+        "/home/triston/workspace/CSD/unlv/output/chr22.genome.unsorted.new",
+        "/home/triston/workspace/CSD/unlv/input/chr22.genome.unsorted.bam",
         "3",
         "-tag XM",
         "-g"
+      ],
+      "stopAtEntry": false,
+      "cwd": "${workspaceFolder}",
+      "environment": [],
+      "externalConsole": false,
+      "MIMode": "gdb",
+      "setupCommands": [
+        {
+          "description": "Enable pretty-printing for gdb",
+          "text": "-enable-pretty-printing",
+          "ignoreFailures": true
+        }
+      ],
+      // "preLaunchTask": "build with make",
+      "miDebuggerPath": "/usr/bin/gdb"
+    },
+    {
+      "name": "Debug rsem-run-em",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/rsem-run-em",
+      "args": [
+        "/home/triston/workspace/CSD/unlv/ref/hg19",
+        "3",
+        "/home/triston/workspace/CSD/unlv/exp.small/chr22.genome.unsorted",
+        "/home/triston/workspace/CSD/unlv/exp.small/chr22.genome.unsorted.temp/chr22.genome.unsorted",
+        "/home/triston/workspace/CSD/unlv/exp.small/chr22.genome.unsorted.stat/chr22.genome.unsorted",
+        "-p 8",
+        "-b /home/triston/workspace/CSD/unlv/exp.small/chr22.genome.unsorted.bam",
+        "--append-names"
       ],
       "stopAtEntry": false,
       "cwd": "${workspaceFolder}",
